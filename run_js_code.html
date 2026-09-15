@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon JavaScript Sandbox Runner</title>
+
+<style>
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+    font-family:Consolas,"Courier New",monospace;
+}
+
+html,body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:#000;
+    color:#00ff66;
+}
+
+body{
+    display:flex;
+    flex-direction:column;
+    padding:8px;
+    gap:8px;
+}
+
+#editor{
+    height:90vh;
+    width:100%;
+    background:#000;
+    color:#00ff66;
+    border:2px solid #00ff66;
+    border-radius:8px;
+    padding:12px;
+    resize:none;
+    outline:none;
+    font-size:15px;
+    box-shadow:0 0 12px #00ff66;
+}
+
+#controls{
+    display:flex;
+    justify-content:flex-end;
+}
+
+#runBtn{
+    background:#000;
+    color:#00ff66;
+    border:2px solid #00ff66;
+    border-radius:6px;
+    padding:4px 12px;
+    cursor:pointer;
+    font-size:12px;
+    box-shadow:0 0 8px #00ff66;
+}
+
+#runBtn:hover{
+    background:#00ff66;
+    color:#000;
+}
+
+#output{
+    height:10vh;
+    width:100%;
+    background:#000;
+    color:#00ff66;
+    border:2px solid #00ff66;
+    border-radius:8px;
+    padding:8px;
+    overflow:auto;
+    white-space:pre-wrap;
+    box-shadow:0 0 12px #00ff66;
+    font-size:13px;
+}
+
+::-webkit-scrollbar{
+    width:8px;
+    height:8px;
+}
+
+::-webkit-scrollbar-thumb{
+    background:#00ff66;
+}
+
+::-webkit-scrollbar-track{
+    background:#000;
+}
+</style>
+</head>
+<body>
+
+<textarea id="editor">
+// Click here and start typing.
+// This text disappears on first click.
+
+console.log("Hello World");
+
+for(let i=1;i<=5;i++){
+    console.log("Count:", i);
+}
+</textarea>
+
+<div id="controls">
+    <button id="runBtn">Execute</button>
+</div>
+
+<div id="output">Ready.</div>
+
+<iframe
+    id="sandbox"
+    sandbox="allow-scripts"
+    style="display:none;">
+</iframe>
+
+<script>
+
+const editor = document.getElementById("editor");
+const output = document.getElementById("output");
+const iframe = document.getElementById("sandbox");
+
+let firstClick = true;
+
+editor.addEventListener("click", function() {
+    if (firstClick) {
+        editor.value = "";
+        firstClick = false;
+    }
+}, { once: true });
+
+function write(msg){
+    output.textContent += "\n" + msg;
+    output.scrollTop = output.scrollHeight;
+}
+
+window.addEventListener("message",(event)=>{
+
+    if(event.source !== iframe.contentWindow) return;
+
+    const data = event.data || {};
+
+    switch(data.type){
+
+        case "clear":
+            output.textContent = "";
+            break;
+
+        case "log":
+            write(data.args.join(" "));
+            break;
+
+        case "warn":
+            write("WARN: " + data.args.join(" "));
+            break;
+
+        case "error":
+            write("ERROR: " + data.args.join(" "));
+            break;
+
+        case "runtime-error":
+            write("ERROR: " + data.message);
+            break;
+
+        case "unhandled-rejection":
+            write("PROMISE ERROR: " + data.message);
+            break;
+    }
+});
+
+function executeCode(){
+
+    const userCode = editor.value;
+
+    const sandboxPage = `
+<!DOCTYPE html>
+<html>
+<body>
+
+<script>
+
+parent.postMessage({type:"clear"},"*");
+
+function send(type,payload){
+    parent.postMessage(
+        Object.assign({type:type},payload),
+        "*"
+    );
+}
+
+console.log = (...args)=>{
+    send("log",{args});
+};
+
+console.warn = (...args)=>{
+    send("warn",{args});
+};
+
+console.error = (...args)=>{
+    send("error",{args});
+};
+
+window.onerror = function(message,source,line,column,error){
+    send("runtime-error",{
+        message: message + " (line " + line + ")"
+    });
+};
+
+window.onunhandledrejection = function(event){
+    send("unhandled-rejection",{
+        message: String(event.reason)
+    });
+};
+
+try {
+
+${userCode}
+
+}
+catch(err){
+
+    send("runtime-error",{
+        message: err.message
+    });
+
+}
+
+<\/script>
+
+</body>
+</html>
+`;
+
+    iframe.srcdoc = sandboxPage;
+}
+
+document
+    .getElementById("runBtn")
+    .addEventListener("click", executeCode);
+
+editor.addEventListener("keydown",(e)=>{
+
+    if(e.ctrlKey && e.key==="Enter"){
+        executeCode();
+    }
+
+});
+
+</script>
+
+</body>
+</html>
