@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <title>  網址 書籤檔 撥放器 </title>
+    <style>
+        :root {
+            --green: #00ff00;
+            --yellow: #ffff00;
+            --bg: #000000;
+            --hover: #333333;
+            --dim-green: #004400;
+        }
+
+        /* 核心佈局：確保頁面剛好填滿視窗，不產生外部捲動 */
+        html, body {
+            height: 100%;
+            margin: 0;
+            background-color: var(--bg);
+            overflow: hidden; /* 防止全頁面出現不必要的捲動條 */
+        }
+
+        body {
+            color: var(--green);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        /* 頂部說明區：高度自適應 */
+        .usage-section {
+            border: 1px solid var(--green);
+            padding: 12px;
+            margin-bottom: 15px;
+            flex-shrink: 0; /* 確保說明區不會被壓縮 */
+        }
+
+        .usage-section h2 {
+            margin: 0 0 8px 0;
+            font-size: 1rem;
+            border-bottom: 1px solid var(--green);
+            display: inline-block;
+        }
+
+        ol {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 0.85rem;
+            line-height: 1.4;
+        }
+
+        /* 主內容區：自動填滿剩餘高度 */
+        .main-content {
+            display: flex;
+            flex: 1; /* 佔用所有剩餘空間 */
+            gap: 15px;
+            min-height: 0; /* Flexbox 修正：允許子元素在必要時縮小 */
+        }
+
+        /* 左側控制區 */
+        .controls {
+            flex: 0 0 300px; /* 固定寬度，但不固定高度 */
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border-right: 1px solid var(--dim-green);
+            padding-right: 15px;
+            overflow-y: auto; /* 若控制項太多也可捲動 */
+        }
+
+        .section-box {
+            border: 1px solid var(--dim-green);
+            padding: 10px;
+            background: #000800;
+        }
+
+        /* 按鈕樣式 */
+        #playBtn {
+            border: 2px solid var(--green);
+            color: var(--yellow);
+            background-color: var(--bg);
+            padding: 12px;
+            font-size: 1.2rem;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        #playBtn:hover { background-color: var(--hover); }
+
+        button.sub-btn {
+            background: var(--bg);
+            color: var(--yellow);
+            border: 1px solid var(--green);
+            padding: 8px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+        }
+        button.sub-btn:hover { background: var(--hover); }
+
+        select {
+            background: var(--bg);
+            color: var(--green);
+            border: 1px solid var(--green);
+            padding: 6px;
+            width: 100%;
+            font-family: inherit;
+        }
+
+        /* 右側清單區：最關鍵的捲動設定 */
+        .list-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--green);
+            background: #000500;
+            min-width: 0;
+        }
+
+        .list-header {
+            background: var(--green);
+            color: var(--bg);
+            padding: 5px 10px;
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        #urlList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto; /* 只有清單區域會產生捲動條 */
+            flex: 1;
+        }
+
+        #urlList li {
+            padding: 10px;
+            border-bottom: 1px solid var(--dim-green);
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+        #urlList li:hover { background-color: var(--hover); }
+        #urlList li.active { background-color: var(--green); color: var(--bg); }
+
+        .track-title { font-weight: bold; display: block; margin-bottom: 2px; font-size: 0.9rem; }
+        .track-url { font-size: 0.7rem; opacity: 0.7; word-break: break-all; }
+
+        /* 自定義捲動條樣式 (WebKit) */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--dim-green); border: 1px solid var(--green); }
+    </style>
+</head>
+<body>
+
+    <div class="usage-section">
+        <h2>使用說明 </h2>
+        <ol>
+            <li><b>LOAD</b>: 上傳 <b>.txt</b> (每行一網址) 或 <b>.html</b> (書籤檔)。</li>
+            <li><b>SELECT</b>: 在右側清單點選項目，系統將自動同步至記憶體。</li>
+            <li><b>PLAY</b>: 點擊黃色 <b>PLAY URL</b> 開啟最後儲存的網址。</li>
+            <li><b>EXPORT</b>: 選取格式後點擊黃色 <b>EXPORT</b> 按鈕下載清單存檔。</li>
+            <li><b>SCROLL</b>: 當清單過長時，右側區域可獨立捲動而不影響版面。</li>
+        </ol>
+    </div>
+
+    <div class="main-content">
+        <!-- 左側：功能控制 -->
+        <div class="controls">
+            <div class="section-box">
+                <input type="file" id="fileLoader" accept=".txt,.html" style="width: 100%; color: var(--green); font-size: 0.8rem;">
+            </div>
+            
+            <button id="playBtn">▶ PLAY URL</button>
+
+            <div class="section-box">
+                <div style="font-size: 0.75rem; margin-bottom: 5px;">EXPORT OPTIONS:</div>
+                <select id="exportFormat">
+                    <option value="json">Format: JSON</option>
+                    <option value="csv">Format: CSV</option>
+                </select>
+                <button class="sub-btn" id="exportBtn" style="margin-top: 8px;">DOWNLOAD / EXPORT</button>
+            </div>
+
+            <div class="section-box" style="font-size: 0.75rem;">
+                <div style="border-bottom: 1px solid var(--dim-green); margin-bottom: 5px; padding-bottom: 3px;">CACHED URL:</div>
+                <span id="currentUrlDisplay" style="color: var(--yellow);">(IDLE)</span>
+            </div>
+        </div>
+
+        <!-- 右側：獨立捲動清單 -->
+        <div class="list-container">
+            <div class="list-header">
+                <span>DATABASE_LOG</span>
+                <span id="countDisplay">0 ITEMS</span>
+            </div>
+            <ul id="urlList">
+                <!-- 動態生成的清單 -->
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const fileLoader = document.getElementById('fileLoader');
+        const urlList = document.getElementById('urlList');
+        const playBtn = document.getElementById('playBtn');
+        const exportBtn = document.getElementById('exportBtn');
+        const currentUrlDisplay = document.getElementById('currentUrlDisplay');
+        const countDisplay = document.getElementById('countDisplay');
+
+        let linkData = [];
+
+        window.onload = () => {
+            const savedUrl = localStorage.getItem('terminal_last_url');
+            if (savedUrl) currentUrlDisplay.innerText = savedUrl;
+        };
+
+        fileLoader.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const content = event.target.result;
+                if (file.name.endsWith('.html')) {
+                    parseBookmarks(content);
+                } else {
+                    parseTxt(content);
+                }
+                renderList();
+            };
+            reader.readAsText(file);
+        });
+
+        function parseTxt(data) {
+            linkData = data.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.startsWith('http'))
+                .map(url => ({ title: url, url: url }));
+        }
+
+        function parseBookmarks(data) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(data, "text/html");
+            const anchors = doc.querySelectorAll('a');
+            linkData = Array.from(anchors).map(a => ({
+                title: a.textContent.trim() || a.href,
+                url: a.href
+            })).filter(item => item.url.startsWith('http'));
+        }
+
+        function renderList() {
+            urlList.innerHTML = '';
+            countDisplay.innerText = `${linkData.length} ITEMS`;
+            const savedUrl = localStorage.getItem('terminal_last_url');
+
+            linkData.forEach((item) => {
+                const li = document.createElement('li');
+                if (item.url === savedUrl) li.classList.add('active');
+                
+                li.innerHTML = `
+                    <span class="track-title">${item.title}</span>
+                    <span class="track-url">${item.url}</span>
+                `;
+                
+                li.onclick = () => selectUrl(item.url);
+                urlList.appendChild(li);
+            });
+        }
+
+        function selectUrl(url) {
+            localStorage.setItem('terminal_last_url', url);
+            currentUrlDisplay.innerText = url;
+            document.querySelectorAll('#urlList li').forEach(li => {
+                li.classList.remove('active');
+                if (li.querySelector('.track-url').innerText === url) li.classList.add('active');
+            });
+        }
+
+        playBtn.onclick = () => {
+            const url = localStorage.getItem('terminal_last_url');
+            if (url && url !== '(IDLE)') window.open(url, '_blank');
+            else alert('Please select a link from the list!');
+        };
+
+        exportBtn.onclick = () => {
+            if (linkData.length === 0) return alert('No data loaded to export.');
+            
+            const format = document.getElementById('exportFormat').value;
+            let content, mimeType, fileName;
+
+            if (format === 'json') {
+                content = JSON.stringify(linkData, null, 2);
+                mimeType = 'application/json';
+                fileName = 'links_export.json';
+            } else {
+                const header = "Title,URL\n";
+                const rows = linkData.map(item => {
+                    const t = `"${item.title.replace(/"/g, '""')}"`;
+                    const u = `"${item.url.replace(/"/g, '""')}"`;
+                    return `${t},${u}`;
+                }).join("\n");
+                content = header + rows;
+                mimeType = 'text/csv';
+                fileName = 'links_export.csv';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            a.click();
+            URL.revokeObjectURL(url);
+        };
+    </script>
+</body>
+</html>
