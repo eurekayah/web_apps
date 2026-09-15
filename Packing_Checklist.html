@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber-Travel Checklist</title>
+    <style>
+        :root {
+            --neon-green: #39FF14;
+            --dark-bg: #0a0a0a;
+            --glass-bg: rgba(57, 255, 20, 0.05);
+        }
+
+        /* 1. 基礎佈局 */
+        body, html {
+            margin: 0;
+            padding: 0;
+            background-color: var(--dark-bg);
+            color: var(--neon-green);
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 450px;
+            padding: 40px 0;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 2. 標題與發光效果 */
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            letter-spacing: 5px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 10px var(--neon-green), 0 0 20px var(--neon-green);
+            border: 1px solid var(--neon-green);
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        /* 3. 新增項目輸入區 */
+        .add-item-box {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+        }
+
+        input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid var(--neon-green);
+            color: var(--neon-green);
+            padding: 12px;
+            font-family: inherit;
+            outline: none;
+            border-radius: 4px;
+        }
+
+        input:focus {
+            box-shadow: 0 0 10px var(--neon-green);
+        }
+
+        .add-btn {
+            background: var(--neon-green);
+            color: #000;
+            border: none;
+            padding: 0 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+
+        .add-btn:hover {
+            box-shadow: 0 0 20px var(--neon-green);
+            transform: translateY(-2px);
+        }
+
+        /* 4. 清單卡片樣式 */
+        .list-card {
+            background: var(--glass-bg);
+            border: 1px solid rgba(57, 255, 20, 0.2);
+            border-radius: 12px;
+            padding: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .item {
+            display: flex;
+            align-items: center;
+            padding: 15px;
+            margin: 5px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(57, 255, 20, 0.1);
+        }
+
+        .item:last-child { border-bottom: none; }
+
+        .item:hover {
+            background: rgba(57, 255, 20, 0.1);
+        }
+
+        /* 狀態圖標 */
+        .checkbox {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--neon-green);
+            margin-right: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        /* 5. 完成狀態 (刪除線 + 變暗) */
+        .item.checked {
+            opacity: 0.3;
+            text-decoration: line-through;
+        }
+        
+        .item.checked .checkbox::after {
+            content: "✓";
+        }
+
+        .item .delete-task {
+            margin-left: auto;
+            color: #ff4d4d;
+            font-size: 12px;
+            padding: 5px;
+            opacity: 0.5;
+        }
+
+        .item .delete-task:hover { opacity: 1; }
+
+        /* 6. 底部控制項 */
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+        }
+
+        #reset-btn {
+            background: transparent;
+            color: var(--neon-green);
+            border: 1px solid var(--neon-green);
+            padding: 10px 25px;
+            cursor: pointer;
+            font-family: inherit;
+            border-radius: 30px;
+            transition: 0.3s;
+            opacity: 0.6;
+        }
+
+        #reset-btn:hover {
+            opacity: 1;
+            background: rgba(57, 255, 20, 0.1);
+            box-shadow: 0 0 15px var(--neon-green);
+        }
+
+        .stats {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>TRAVEL_LOG v2.0</h1>
+
+        <!-- 新增自定義項目 -->
+        <div class="add-item-box">
+            <input type="text" id="new-item-input" placeholder="新增清單項目...">
+            <button class="add-btn" onclick="addItem()">+</button>
+        </div>
+
+        <!-- 檢查清單卡片 -->
+        <div class="list-card" id="list-container">
+            <!-- 內容由 JS 產生 -->
+        </div>
+
+        <div class="footer">
+            <div class="stats" id="stats-text">PROGRESS: 0%</div>
+            <br>
+            <button id="reset-btn" onclick="resetCheckboxes()">一鍵重設 (UNCHECK ALL)</button>
+        </div>
+    </div>
+
+    <script>
+        // 預設核心清單
+        const defaultItems = [
+            { text: "護照 / 簽證 / 身分證", checked: false, isDefault: true },
+            { text: "手機 / 電腦 / 充電器", checked: false, isDefault: true },
+            { text: "行動電源 / 轉接頭", checked: false, isDefault: true },
+            { text: "換洗衣物 / 內衣褲", checked: false, isDefault: true },
+            { text: "牙刷 / 刮鬍刀 / 保養品", checked: false, isDefault: true },
+            { text: "常備藥品 / 醫療包", checked: false, isDefault: true }
+        ];
+
+        let items = JSON.parse(localStorage.getItem('cyber_travel_items')) || defaultItems;
+
+        function renderList() {
+            const container = document.getElementById('list-container');
+            container.innerHTML = '';
+            let checkedCount = 0;
+
+            items.forEach((item, index) => {
+                const div = document.createElement('div');
+                div.className = `item ${item.checked ? 'checked' : ''}`;
+                
+                div.innerHTML = `
+                    <div class="checkbox"></div>
+                    <span class="text" onclick="toggleItem(${index})">${item.text}</span>
+                    ${!item.isDefault ? `<span class="delete-task" onclick="deleteItem(${index})">[REMOVE]</span>` : ''}
+                `;
+                
+                // 點擊 checkbox 或文字區塊切換狀態
+                div.querySelector('.checkbox').onclick = () => toggleItem(index);
+
+                container.appendChild(div);
+                if (item.checked) checkedCount++;
+            });
+
+            // 更新百分比
+            const percent = items.length > 0 ? Math.round((checkedCount / items.length) * 100) : 0;
+            document.getElementById('stats-text').textContent = `SYSTEM READINESS: ${percent}%`;
+            
+            localStorage.setItem('cyber_travel_items', JSON.stringify(items));
+        }
+
+        // 新增自定義項目
+        function addItem() {
+            const input = document.getElementById('new-item-input');
+            const text = input.value.trim();
+            if (text) {
+                items.push({ text: text, checked: false, isDefault: false });
+                input.value = '';
+                renderList();
+            }
+        }
+
+        // 刪除自定義項目
+        function deleteItem(index) {
+            items.splice(index, 1);
+            renderList();
+        }
+
+        // 切換勾選
+        function toggleItem(index) {
+            items[index].checked = !items[index].checked;
+            renderList();
+        }
+
+        // 一鍵重設 (只清除勾選，不刪除項目)
+        function resetCheckboxes() {
+            if (confirm("是否重設所有勾選狀態？")) {
+                items = items.map(item => ({ ...item, checked: false }));
+                renderList();
+            }
+        }
+
+        // 支援 Enter 鍵新增
+        document.getElementById('new-item-input').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addItem();
+        });
+
+        renderList();
+    </script>
+</body>
+</html>

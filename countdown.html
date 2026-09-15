@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>倒數計時器</title>
+  <style>
+    /* 修改為您偏好的黑底綠字風格 */
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      text-align: center;
+      background-color: #000000;
+      color: #39FF14;
+      margin: 20px;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #111;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 15px rgba(57, 255, 20, 0.3);
+      border: 1px solid #39FF14;
+    }
+    .input-group {
+      margin: 10px 0;
+    }
+    .event-list {
+      list-style-type: none;
+      padding: 0;
+    }
+    .event-item {
+      padding: 10px;
+      border-bottom: 1px solid #333;
+    }
+    input {
+      background: #000;
+      border: 1px solid #39FF14;
+      color: #39FF14;
+      padding: 5px;
+    }
+
+    input::placeholder {
+      color: #005500;
+      opacity: 1;
+    }
+    input[type="file"] {
+      color: #FFFF00;      /* 檔名顯示 */
+      background: #000000;
+    }
+    input[type="file"]::file-selector-button {
+      background: #000000;
+      color: #FFFF00;
+      border: 1px solid #FFFF00;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    input[type="file"]::file-selector-button:hover {
+      background: #FFFF00;
+      color: #000000;
+    }
+
+    button {
+      padding: 5px 10px;
+      margin: 5px;
+      background-color: transparent;
+      color: #FFFF00;
+      border: 1px solid #FFFF00;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #39FF14;
+      color: #000;
+    }
+    #alertSound {
+      display: none;
+    }
+    .passed {
+      color: #ff4d4d;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>倒數計時器</h1>
+    <div class="input-group">
+      <input type="datetime-local" id="eventDate">
+      <input type="text" id="eventName" placeholder="事件名稱">
+      <button onclick="addEvent()">添加事件</button>
+    </div>
+    <ul id="eventList" class="event-list"></ul>
+    <div>
+      <button onclick="downloadEvents()">儲存備份 (JSON)</button>
+      <input type="file" id="uploadInput" accept=".json" onchange="uploadEvents()">
+    </div>
+  </div>
+  <audio id="alertSound" src="../censor-beep.mp3" preload="auto"></audio>
+
+  <script>
+    // 修改 1: 從 localStorage 讀取初始資料
+    let events = JSON.parse(localStorage.getItem('timer_events')) || [];
+    const alertSound = document.getElementById('alertSound');
+
+    // 修改 2: 建立儲存函數
+    function saveToStorage() {
+      localStorage.setItem('timer_events', JSON.stringify(events));
+    }
+
+    function addEvent() {
+      const dateInput = document.getElementById('eventDate').value;
+      const nameInput = document.getElementById('eventName').value;
+      if (dateInput && nameInput) {
+        events.push({ date: dateInput, event: nameInput });
+        saveToStorage(); // 儲存
+        updateEventList();
+        document.getElementById('eventDate').value = '';
+        document.getElementById('eventName').value = '';
+      }
+    }
+
+    function updateEventList() {
+      const eventList = document.getElementById('eventList');
+      eventList.innerHTML = '';
+      events.forEach((event, index) => {
+        const li = document.createElement('li');
+        li.className = 'event-item';
+        li.innerHTML = `${event.event} (${event.date}): <span id="countdown-${index}"></span> <button onclick="removeEvent(${index})">刪除</button>`;
+        eventList.appendChild(li);
+        startCountdown(index);
+      });
+    }
+
+    function removeEvent(index) {
+      events.splice(index, 1);
+      saveToStorage(); // 儲存
+      updateEventList();
+    }
+
+    // 修改 3: 為了效能，將 setInterval 獨立出來避免重複累加
+    function startCountdown(index) {
+      const countdownElement = document.getElementById(`countdown-${index}`);
+      const timer = setInterval(() => {
+        if (!document.getElementById(`countdown-${index}`)) {
+          clearInterval(timer);
+          return;
+        }
+        const now = new Date();
+        const target = new Date(events[index].date);
+        const diff = target - now;
+
+        if (diff <= 0) {
+          countdownElement.textContent = `已過 ${formatTime(-diff)}`;
+          countdownElement.className = 'passed';
+          const timeSincePassed = -diff;
+          if (timeSincePassed < 10 * 60 * 1000 && !countdownElement.dataset.alerted) {
+            alert(`${events[index].event} 時間已到！`);
+            alertSound.play().catch(() => {});
+            countdownElement.dataset.alerted = 'true';
+          }
+        } else {
+          countdownElement.textContent = `剩餘 ${formatTime(diff)}`;
+          countdownElement.className = '';
+          countdownElement.dataset.alerted = 'false';
+        }
+      }, 1000);
+    }
+
+    function formatTime(diff) {
+      const absDiff = Math.abs(diff);
+      const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((absDiff % (1000 * 60)) / 1000);
+      return `${days}天 ${hours}小時 ${minutes}分 ${seconds}秒`;
+    }
+
+    function downloadEvents() {
+      const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(events));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute('href', dataStr);
+      downloadAnchorNode.setAttribute('download', 'events_backup.json');
+      document.body.appendChild(downloadAnchorNode);
+      downloadAnchorNode.click();
+      document.body.removeChild(downloadAnchorNode);
+    }
+
+    function uploadEvents() {
+      const fileInput = document.getElementById('uploadInput');
+      const file = fileInput.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          events = JSON.parse(e.target.result);
+          saveToStorage(); // 儲存上傳的資料
+          updateEventList();
+        };
+        reader.readAsText(file);
+        fileInput.value = '';
+      }
+    }
+
+    // 修改 4: 頁面開啟時自動執行一次，讀取 localStorage 內的事件
+    updateEventList();
+  </script>
+</body>
+</html>

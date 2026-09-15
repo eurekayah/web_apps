@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>常用 網頁應用 </title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #333;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-radius: 48px;
+            padding: 40px 35px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* 主標題改為淺綠色 */
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #b2ff59; /* 亮淺綠 */
+            letter-spacing: -0.5px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .subtitle {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 15px;
+            margin-bottom: 32px;
+            border-left: 4px solid #b2ff59;
+            padding-left: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 0 12px 12px 0;
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 18px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            border-radius: 20px;
+            padding: 22px 16px 18px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            transition: all 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            cursor: pointer;
+            text-decoration: none;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 120px;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-6px);
+            border-color: #b2ff59;
+            box-shadow: 0 16px 32px -8px rgba(178, 255, 89, 0.25);
+            background: rgba(255, 255, 255, 0.18);
+        }
+
+        .card:active {
+            transform: scale(0.97);
+        }
+
+        /* 卡片標題改為淺綠色 */
+        .card-title {
+            font-weight: 600;
+            font-size: 20px;
+            color: #b2ff59; /* 亮淺綠 */
+            letter-spacing: 0.3px;
+        }
+
+        .card-index {
+            position: absolute;
+            top: 10px;
+            right: 14px;
+            font-size: 11px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.25);
+            letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 500px) {
+            .container {
+                padding: 24px 18px;
+                border-radius: 32px;
+            }
+            .grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 12px;
+            }
+            .card {
+                min-height: 100px;
+                padding: 16px 10px;
+            }
+            .card-title {
+                font-size: 17px;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+        }
+
+        .card.pop {
+            animation: popAnim 0.2s ease;
+        }
+        @keyframes popAnim {
+            0% { transform: scale(1); }
+            50% { transform: scale(0.92); }
+            100% { transform: scale(1); }
+        }
+
+        .footer-note {
+            margin-top: 32px;
+            text-align: center;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 20px;
+            letter-spacing: 0.3px;
+        }
+        .footer-note span {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 2px 12px;
+            border-radius: 40px;
+            font-weight: 500;
+            color: #b2ff59;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🧭 導航</h1>
+        <div class="subtitle">點擊卡片前往常用連網站 </div>
+
+        <div id="cardGrid" class="grid"></div>
+
+        <div class="footer-note">
+            ⚡ 點擊統計記錄於主控台 (F12)
+        </div>
+    </div>
+
+    <script>
+        const linkData = [
+            { title: '極簡筆記本', url: './simple_note.html' },
+            { title: '極簡音樂播放器', url: './audio_player.html' },
+            { title: '統一發票對獎', url: './winning_number_check.html' },
+            { title: '網址、二維碼 互轉', url: './url_to_from_qrcode.html' },
+            { title: '時間加法器', url: './time_adder.html' },
+            { title: '旅行行李清單檢查表', url: './Packing_Checklist.html' },
+            { title: '倒數計時', url: 'countdown.html' },
+            { title: '顏色顯示器', url: './color_display.html' }
+        ];
+
+        const grid = document.getElementById('cardGrid');
+
+        function renderCards() {
+            grid.innerHTML = '';
+
+            linkData.forEach((item, index) => {
+                const card = document.createElement('a');
+                card.href = item.url;
+                card.target = '_blank';
+                card.rel = 'noopener noreferrer';
+                card.className = 'card';
+
+                const indexSpan = document.createElement('span');
+                indexSpan.className = 'card-index';
+                indexSpan.textContent = `#${index + 1}`;
+                card.appendChild(indexSpan);
+
+                const titleEl = document.createElement('div');
+                titleEl.className = 'card-title';
+                titleEl.textContent = item.title;
+                card.appendChild(titleEl);
+
+                card.addEventListener('click', function(e) {
+                    this.classList.remove('pop');
+                    void this.offsetWidth;
+                    this.classList.add('pop');
+                    console.log(`✅ 點擊了 [${item.title}]，前往：${item.url}`);
+                });
+
+                grid.appendChild(card);
+            });
+
+            console.log(`🎯 導航已載入，共 ${linkData.length} 個連結。`);
+        }
+
+        renderCards();
+    </script>
+
+</body>
+</html>

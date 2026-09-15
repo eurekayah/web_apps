@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Adder - Terminal Edition</title>
+    <style>
+        body {
+            background-color: #000;
+            color: #00ff00;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            text-transform: uppercase;
+        }
+
+        .container {
+            border: 2px solid #00ff00;
+            padding: 2rem;
+            box-shadow: 0 0 15px #00ff00;
+            width: 100%;
+            max-width: 500px;
+            background-color: #000;
+        }
+
+        h2 {
+            text-align: center;
+            margin-top: 0;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #00ff00;
+            padding-bottom: 10px;
+        }
+
+        p {
+            font-size: 0.8rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: #008800; /* Dimmer green for help text */
+        }
+
+        input {
+            width: 100%;
+            padding: 12px;
+            background-color: #000;
+            border: 1px solid #00ff00;
+            color: #00ff00;
+            font-size: 1.2rem;
+            box-sizing: border-box;
+            margin-bottom: 1rem;
+            outline: none;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        input::placeholder {
+            color: #004400;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #00ff00;
+            color: #000;
+            border: none;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background-color: #000;
+            color: #00ff00;
+            outline: 1px solid #00ff00;
+        }
+
+        .result-container {
+            margin-top: 1.5rem;
+            border-top: 1px dashed #00ff00;
+            padding-top: 1rem;
+            text-align: center;
+        }
+
+        .result-label {
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .result-value {
+            font-size: 3rem;
+            font-weight: bold;
+            text-shadow: 0 0 10px #00ff00;
+        }
+
+        .error {
+            color: #ff0000;
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            display: none;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div>
+使用說明
+<ol>
+<li>
+ <strong>輸入格式</strong>：<br>
+ 請在輸入框中輸入時間，格式為 <code>分鐘:秒數</code>。如果要加總多個時間，請使用 <strong><code>+</code></strong> 號分隔。
+            <ul>
+                <li>範例：<code>1:30 + 2:45 + 0:50</code></li>
+            </ul>
+        </li>
+</ol>
+<br>
+快速範例
+    <div class="example-box">
+        <p>如果您想計算三段影片的長度：</p>
+        <ul>
+            <li>影片 A: 1分30秒</li>
+            <li>影片 B: 45秒</li>
+            <li>影片 C: 12分10秒</li>
+        </ul>
+        <p>您只需輸入：<code>1:30 + 0:45 + 12:10</code><br>
+        結果將顯示為：<code>14:25</code></p>
+    </div>
+</div>
+
+
+<div class="container">
+    <h2>TIME_ADDER</h2>
+    <!-- onfocus="this.value=''" makes the input empty when active -->
+    <input type="text" id="timeInput" 
+           placeholder="00:00 + 00:00" 
+           value="1:30 + 2:45"
+           onfocus="this.value=''">
+    
+    <button onclick="calculateTotal()">RUN CALCULATION</button>
+    
+    <div id="errorBox" class="error">!! INVALID_SYNTAX !!</div>
+
+    <div class="result-container">
+        <div class="result-label">SUM_OUTPUT:</div>
+        <div id="result" class="result-value">00:00</div>
+    </div>
+</div>
+
+<script>
+    function calculateTotal() {
+        const input = document.getElementById('timeInput').value;
+        const resultDisplay = document.getElementById('result');
+        const errorBox = document.getElementById('errorBox');
+        
+        if (!input.trim()) return;
+
+        const parts = input.split('+').map(p => p.trim());
+        let totalSeconds = 0;
+        let hasError = false;
+
+        parts.forEach(part => {
+            if (part === "") return;
+            const timeParts = part.split(':');
+            
+            if (timeParts.length === 2) {
+                const mins = parseInt(timeParts[0]);
+                const secs = parseInt(timeParts[1]);
+                if (isNaN(mins) || isNaN(secs)) hasError = true;
+                else totalSeconds += (mins * 60) + secs;
+            } else if (timeParts.length === 3) {
+                const hrs = parseInt(timeParts[0]);
+                const mins = parseInt(timeParts[1]);
+                const secs = parseInt(timeParts[2]);
+                if (isNaN(hrs) || isNaN(mins) || isNaN(secs)) hasError = true;
+                else totalSeconds += (hrs * 3600) + (mins * 60) + secs;
+            } else {
+                hasError = true;
+            }
+        });
+
+        if (hasError) {
+            errorBox.style.display = 'block';
+            resultDisplay.innerText = "ERROR";
+            return;
+        } else {
+            errorBox.style.display = 'none';
+        }
+
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        const s = totalSeconds % 60;
+
+        const pad = (num) => num.toString().padStart(2, '0');
+        
+        let finalDisplay = h > 0 
+            ? `${h}:${pad(m)}:${pad(s)}` 
+            : `${m}:${pad(s)}`;
+
+        resultDisplay.innerText = finalDisplay;
+    }
+
+    // Allow Enter key
+    document.getElementById('timeInput').addEventListener('keypress', function (e) {
+        if (e.key === 'Enter') calculateTotal();
+    });
+</script>
+
+</body>
+</html>

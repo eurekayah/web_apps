@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Color Display</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        text-align: center;
+        margin-top: 50px;
+    }
+    input {
+        padding: 8px;
+        font-size: 16px;
+        width: 260px;
+        text-align: center;
+    }
+    button {
+        padding: 8px 12px;
+        font-size: 16px;
+        cursor: pointer;
+    }
+    #colorBox {
+        width: 100px;
+        height: 100px;
+        margin: 20px auto;
+        border: 2px solid #333;
+        background-color: #ffffff;
+    }
+    #colorCode {
+        font-weight: bold;
+        margin-top: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h2>Color Display</h2>
+
+<input type="text" id="colorInput" placeholder="#39FF14, rgb(255,255,0), yellow" value="#39FF14">
+<button onclick="showColor()">Show Color</button>
+
+<div id="colorBox"></div>
+<div id="colorCode"></div>
+
+<script>
+function isValidColor(color) {
+    const test = new Option().style;
+    test.color = color;
+    return test.color !== "";
+}
+
+function showColor() {
+    const color = document.getElementById("colorInput").value.trim();
+    const box = document.getElementById("colorBox");
+    const label = document.getElementById("colorCode");
+
+    if (isValidColor(color)) {
+        box.style.backgroundColor = color;
+        label.textContent = color;
+    } else {
+        alert("Please enter a valid color. Examples: #39FF14, rgb(255,255,0), rgba(255,255,0,0.5), hsl(60,100%,50%), yellow");
+    }
+}
+
+showColor();
+</script>
+
+</body>
+</html>

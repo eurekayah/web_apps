@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>極簡筆記本</title>
+    <style>
+        /* 1. 全域樣式設定 */
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #000000;
+            /* 背景黑 */
+            overflow: hidden;
+        }
+
+        /* 2. 輸入區樣式 */
+        #notepad {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            outline: none;
+            padding: 40px;
+            box-sizing: border-box;
+
+            background-color: #000000;
+            /* 背景黑 */
+            color: #00FF00;
+            /* 文字綠 */
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 1.2rem;
+            line-height: 1.6;
+
+            caret-color: #00FF00;
+            /* 游標綠 */
+            resize: none;
+        }
+
+        /* 提示文字 (Placeholder) 顏色為綠色 */
+        #notepad::placeholder {
+            color: rgba(0, 255, 0, 0.4);
+        }
+
+        /* 3. 按鈕群組樣式 */
+        .btn-group {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 8px;
+        }
+
+        /* 黃色按鈕 - 縮小版 */
+        .yellow-btn {
+            padding: 6px 12px;
+            background-color: #FFFF00;
+            color: #000000;
+            border: 1px solid #FFFF00;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: monospace;
+            font-size: 0.75rem;
+            font-weight: bold;
+            transition: all 0.2s ease;
+            opacity: 0.6;
+        }
+
+        .yellow-btn:hover {
+            opacity: 1;
+            background-color: #FFD700;
+            box-shadow: 0 0 10px rgba(255, 255, 0, 0.5);
+        }
+
+        #file-input {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 輸入區 -->
+    <textarea id="notepad" placeholder="在此輸入內容..."></textarea>
+
+    <!-- 隱藏的檔案讀取器 -->
+    <input type="file" id="file-input">
+
+    <!-- 按鈕群組 (順序：LOAD -> SAVE -> CLEAR) -->
+    <div class="btn-group">
+        <button class="yellow-btn" onclick="document.getElementById('file-input').click()">LOAD</button>
+        <button class="yellow-btn" onclick="saveFile()">SAVE</button>
+        <button class="yellow-btn" onclick="clearAll()">CLEAR</button>
+    </div>
+
+    <script>
+        const notepad = document.getElementById('notepad');
+        const fileInput = document.getElementById('file-input');
+
+        // 儲存當前載入的檔案名稱（不含路徑）
+        let currentFileName = null;
+
+        // [載入] 從 LocalStorage 恢復資料
+        window.onload = () => {
+            const savedContent = localStorage.getItem('simple_note_content');
+            if (savedContent) {
+                notepad.value = savedContent;
+            }
+        };
+
+        // [自動儲存] 監聽輸入即時存入瀏覽器
+        notepad.addEventListener('input', () => {
+            localStorage.setItem('simple_note_content', notepad.value);
+        });
+
+        // [功能：CLEAR 清除所有內容]
+        function clearAll() {
+            if (confirm("確定要清除所有文字嗎？")) {
+                notepad.value = '';
+                localStorage.setItem('simple_note_content', '');
+                notepad.focus();
+            }
+        }
+
+        // [功能：LOAD 載入本地檔案]
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                notepad.value = event.target.result;
+                localStorage.setItem('simple_note_content', notepad.value);
+                // 儲存檔案名稱，供後續 SAVE 使用
+                currentFileName = file.name;
+                fileInput.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        // [功能：SAVE 儲存為 .txt 檔案]
+        function saveFile() {
+            const textContent = notepad.value;
+            if (!textContent) return;
+
+            const blob = new Blob([textContent], { type: 'text/plain' });
+
+            const a = document.createElement('a');
+            let fileName;
+
+            if (currentFileName) {
+                // 若先前有載入檔案，使用相同的檔案名稱
+                fileName = currentFileName;
+            } else {
+                // 否則以時間戳記產生新檔名
+                const now = new Date();
+                const timestamp = now.getFullYear() +
+                    String(now.getMonth() + 1).padStart(2, '0') +
+                    String(now.getDate()).padStart(2, '0') + "_" +
+                    String(now.getHours()).padStart(2, '0') +
+                    String(now.getMinutes()).padStart(2, '0');
+                fileName = `note_${timestamp}.txt`;
+            }
+
+            a.download = fileName;
+            a.href = window.URL.createObjectURL(blob);
+
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(a.href);
+        }
+    </script>
+
+</body>
+</html>

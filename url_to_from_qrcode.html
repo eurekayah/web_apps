@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QR Code 產生器</title>
+    <script src="https://cdn.jsdelivr.net/npm/qr-code-styling@1.5.0/lib/qr-code-styling.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            min-height: 100%;
+            width: 100%;
+            background-color: #000000;
+            color: #39FF14;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            overflow-y: auto;
+            padding: 30px 0;
+            box-sizing: border-box;
+        }
+        h1 {
+            font-size: 1.5rem;
+            letter-spacing: 5px;
+            margin-bottom: 25px;
+            text-shadow: 0 0 10px #39FF14;
+        }
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            width: 90%;
+            max-width: 500px;
+        }
+        input[type="text"] {
+            flex: 1;
+            background: transparent;
+            border: 1px solid #39FF14;
+            color: #39FF14;
+            padding: 12px;
+            font-family: inherit;
+            outline: none;
+            border-radius: 4px;
+        }
+        input::placeholder {
+            color: rgba(57, 255, 20, 0.3);
+        }
+        button {
+            background: #39FF14;
+            color: #000;
+            border: none;
+            padding: 0 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: 0.3s;
+        }
+        button:hover {
+            box-shadow: 0 0 20px #39FF14;
+        }
+        #qrcode-container {
+            padding: 20px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(57, 255, 20, 0.4);
+            display: none;
+        }
+        .hint {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            opacity: 0.5;
+        }
+        #download-btn {
+            margin-top: 15px;
+            background: #8E44AD;
+            color: #fff;
+            border: none;
+            padding: 10px 25px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: 0.3s;
+            display: none;
+        }
+        #download-btn:hover {
+            box-shadow: 0 0 25px #8E44AD;
+            transform: scale(1.02);
+        }
+
+        /* --- 上传区样式 --- */
+        .upload-section {
+            width: 90%;
+            max-width: 500px;
+            margin-top: 25px;
+            border-top: 1px dashed rgba(57, 255, 20, 0.3);
+            padding-top: 20px;
+            text-align: center;
+        }
+        .upload-label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            opacity: 0.8;
+        }
+        #drop-zone {
+            border: 2px dashed #8E44AD;
+            border-radius: 8px;
+            padding: 25px 15px;
+            cursor: pointer;
+            transition: 0.3s;
+            color: #B39DDB;
+            font-size: 0.85rem;
+            background: rgba(142, 68, 173, 0.05);
+        }
+        #drop-zone:hover, #drop-zone.dragover {
+            border-color: #39FF14;
+            background: rgba(57, 255, 20, 0.05);
+            color: #39FF14;
+            box-shadow: 0 0 15px rgba(57, 255, 20, 0.2);
+        }
+        #file-input {
+            display: none;
+        }
+        #decoded-result {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            word-break: break-all;
+            color: #B39DDB;
+            min-height: 1em;
+        }
+        #decoded-result a {
+            color: #39FF14;
+            text-decoration: underline;
+        }
+        .status-ok { color: #39FF14; }
+        .status-err { color: #E74C3C; }
+    </style>
+</head>
+<body>
+
+    <h1>QR_GENERATOR_v1.0</h1>
+
+    <div class="input-container">
+        <input type="text" id="url-input" placeholder="請貼上網址 (https://...)" />
+        <button onclick="generateQR()">GENERATE</button>
+    </div>
+
+    <div id="qrcode-container"></div>
+    <button id="download-btn">⬇ DOWNLOAD QR</button>
+    <div class="hint" id="hint-text">READY_TO_ENCODE</div>
+
+    <!-- 二维码上传解码区 -->
+    <div class="upload-section">
+        <label class="upload-label">◈ UPLOAD_QRCODE_TO_DECODE ◈</label>
+        <div id="drop-zone">
+            點擊或拖曳 QR Code 圖片到此處
+            <input type="file" id="file-input" accept="image/*" />
+        </div>
+        <div id="decoded-result"></div>
+    </div>
+
+    <script>
+        const qrcodeContainer = document.getElementById('qrcode-container');
+        const urlInput = document.getElementById('url-input');
+        const hintText = document.getElementById('hint-text');
+        const downloadBtn = document.getElementById('download-btn');
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const decodedResult = document.getElementById('decoded-result');
+
+        let qrCodeInstance = null;
+
+        /* ---------- 生成 QR ---------- */
+        function generateQR() {
+            const url = urlInput.value.trim();
+            if (!url) {
+                alert("請輸入有效的網址");
+                return;
+            }
+
+            qrcodeContainer.innerHTML = '';
+            qrcodeContainer.style.display = 'block';
+            hintText.textContent = "ENCODING_SUCCESS";
+            downloadBtn.style.display = 'none';
+
+            qrCodeInstance = new QRCodeStyling({
+                width: 200,
+                height: 200,
+                type: "canvas",
+                data: url,
+                margin: 10,
+                qrOptions: {
+                    typeNumber: 0,
+                    mode: "Byte",
+                    errorCorrectionLevel: "H"
+                },
+                dotsOptions: {
+                    color: "#8E44AD",
+                    type: "rounded"
+                },
+                backgroundOptions: {
+                    color: "#ffffff",
+                },
+                cornersSquareOptions: {
+                    color: "#9B59B6",
+                    type: "extra-rounded"
+                },
+                cornersDotOptions: {
+                    color: "#6C3483",
+                    type: "dot"
+                }
+            });
+
+            qrCodeInstance.append(qrcodeContainer);
+
+            setTimeout(() => {
+                const canvas = qrcodeContainer.querySelector('canvas');
+                if (canvas) {
+                    downloadBtn.style.display = 'inline-block';
+                    downloadBtn.onclick = function() {
+                        const c = qrcodeContainer.querySelector('canvas');
+                        if (c) {
+                            const link = document.createElement('a');
+                            link.download = 'qrcode.png';
+                            link.href = c.toDataURL('image/png');
+                            link.click();
+                        }
+                    };
+                }
+            }, 200);
+        }
+
+        urlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') generateQR();
+        });
+
+        /* ---------- 上传 & 解码 ---------- */
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) handleFile(file);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) handleFile(file);
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                decodedResult.innerHTML = '<span class="status-err">❌ 請上傳圖片檔案</span>';
+                return;
+            }
+
+            decodedResult.innerHTML = '<span style="color:#B39DDB">🔍 解碼中...</span>';
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    // 创建 canvas 并绘制图片
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: 'dontInvert'
+                    });
+
+                    if (code && code.data) {
+                        const decodedUrl = code.data;
+                        decodedResult.innerHTML =
+                            `<span class="status-ok">✅ 解碼成功：</span><br>` +
+                            `<a href="${decodedUrl}" target="_blank">${decodedUrl}</a>`;
+
+                        // 自动填入输入框，方便重新生成
+                        urlInput.value = decodedUrl;
+                        hintText.textContent = "DECODED_FROM_IMAGE";
+                    } else {
+                        decodedResult.innerHTML = '<span class="status-err">❌ 無法辨識此圖片中的 QR Code</span>';
+                    }
+                };
+                img.onerror = () => {
+                    decodedResult.innerHTML = '<span class="status-err">❌ 圖片載入失敗</span>';
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
+</body>
+</html>

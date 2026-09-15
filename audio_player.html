@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Terminal Audio Player</title>
+    <style>
+        :root {
+            --color-green: #00ff00;
+            --color-bg: #000000;
+            --color-dim: #004400;
+            --color-yellow: #ffff00;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-y: auto;
+            text-transform: uppercase;
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        /* ── 主容器：垂直排列 ── */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            flex: 1 0 auto;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        /* ── 左側播放控制：無滾動條，自動撐開 ── */
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            border: 1px solid var(--color-green);
+            padding: 18px 16px;
+            background: var(--color-bg);
+            flex-shrink: 0;
+        }
+
+        .player-section .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        #fileInput,
+        #singleFileInput {
+            display: none;
+        }
+
+        .btn {
+            background: #333;
+            color: var(--color-yellow);
+            border: none;
+            padding: 12px 20px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s, outline 0.2s;
+            flex: 1 0 auto;
+            text-align: center;
+            touch-action: manipulation;
+            font-size: 0.95rem;
+        }
+
+        .btn:hover {
+            background: #111;
+            outline: 1px solid var(--color-green);
+        }
+
+        .status-area {
+            font-size: 1rem;
+            border-bottom: 1px dashed var(--color-dim);
+            padding-bottom: 6px;
+            word-break: break-word;
+        }
+
+        .audio-wrapper {
+            width: 100%;
+        }
+
+        #audioPlayer {
+            width: 100%;
+            filter: invert(100%) hue-rotate(180deg) brightness(1.5);
+            display: block;
+        }
+
+        .track-name {
+            color: #fff;
+            font-size: 1rem;
+            word-break: break-all;
+            border-top: 1px dashed var(--color-dim);
+            padding-top: 8px;
+        }
+
+        .extra-info {
+            color: var(--color-dim);
+            font-size: 0.8rem;
+        }
+
+        /* ── 右側播放清單 ── */
+        .playlist-section {
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--color-green);
+            background: var(--color-bg);
+            flex: 1 1 auto;
+            min-height: 200px;
+            overflow: hidden;
+        }
+
+        .playlist-header {
+            padding: 10px;
+            background: var(--color-dim);
+            border-bottom: 1px solid var(--color-green);
+            text-align: center;
+            flex-shrink: 0;
+            font-weight: bold;
+        }
+
+        #playlist {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            overflow-y: auto;
+            flex: 1 1 auto;
+            max-height: 45vh;      /* 手機上保留可捲動空間 */
+        }
+
+        #playlist li {
+            padding: 14px 12px;
+            border-bottom: 1px solid var(--color-dim);
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            touch-action: manipulation;
+        }
+
+        #playlist li:hover {
+            background: var(--color-dim);
+        }
+
+        #playlist li.active {
+            background: var(--color-green);
+            color: var(--color-bg);
+        }
+
+        #playlist li.active::before {
+            content: "> ";
+        }
+
+        /* ── 滾動條樣式 ── */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--color-bg);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--color-dim);
+            border: 1px solid var(--color-green);
+        }
+
+        /* ── 底部使用說明 ── */
+        footer {
+            border: 1px solid var(--color-green);
+            padding: 12px 14px;
+            margin-top: 18px;
+            font-size: 0.8rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            width: 100%;
+            flex-shrink: 0;
+        }
+
+        footer h1 {
+            font-size: 1rem;
+            margin: 0 0 6px 0;
+            border-bottom: 1px solid var(--color-green);
+        }
+
+        footer ol {
+            margin: 4px 0 0 0;
+            padding-left: 18px;
+        }
+
+        footer ol li {
+            margin-bottom: 4px;
+        }
+
+        /* ── 手機微調 ── */
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+                font-size: 0.9rem;
+            }
+
+            .btn {
+                padding: 14px 12px;
+                font-size: 0.85rem;
+                flex: 1 1 40%;
+            }
+
+            .player-section {
+                padding: 14px 12px;
+                gap: 12px;
+            }
+
+            #playlist li {
+                padding: 12px 10px;
+                font-size: 0.8rem;
+            }
+
+            footer {
+                padding: 10px 12px;
+                font-size: 0.75rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <!-- 播放控制 (上方) -->
+        <div class="player-section">
+            <div class="btn-group">
+                <label for="fileInput" class="btn">SELECT FOLDER</label>
+                <input type="file" id="fileInput" webkitdirectory directory multiple accept="audio/*">
+                <label for="singleFileInput" class="btn">SELECT FILE</label>
+                <input type="file" id="singleFileInput" accept="audio/*">
+            </div>
+
+            <div class="status-area" id="status">STATUS: IDLE</div>
+
+            <div class="audio-wrapper">
+                <audio id="audioPlayer" controls></audio>
+            </div>
+
+            <div class="track-name" id="currentTrackName" style="color:#fff;">—</div>
+            <div class="extra-info">␣ SPACE TOGGLE PLAY/PAUSE</div>
+        </div>
+
+        <!-- 播放清單 (下方) -->
+        <div class="playlist-section">
+            <div class="playlist-header">FILES_LIST</div>
+            <ul id="playlist"></ul>
+        </div>
+    </div>
+
+    <!-- 底部使用說明 -->
+    <footer>
+        <h1>系統使用說明 (USAGE)</h1>
+        <ol>
+            <li>點擊 [SELECT FOLDER] 選擇包含音訊檔案的資料夾；或點擊 [SELECT FILE] 選取單一檔案播放。</li>
+            <li>程式將自動依序播放支援的格式 (MP3, WAV, OGG)。</li>
+            <li>頁面會自動紀錄進度，重新整理後請「重新選取相同資料夾」或「重新選取相同檔案」即可續播。</li>
+            <li>續播邏輯 (localStorage)：程式會即時將「檔名」與「當前秒數」存入瀏覽器的本地儲存空間。<br>
+                重要：為了隱私與安全，瀏覽器不允許網頁直接讀取硬碟路徑。因此當頁面關閉或重新整理後，使用者需要重新選取相同資料夾或檔案，程式比對檔名後就會自動跳轉到上次中斷的位置。
+            </li>
+            <li>互動強化：點擊右側清單即可切換歌曲，並支援空白鍵播放/暫停。</li>
+        </ol>
+    </footer>
+
+    <script>
+        (function() {
+            const fileInput = document.getElementById('fileInput');
+            const singleFileInput = document.getElementById('singleFileInput');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playlistElement = document.getElementById('playlist');
+            const statusDisplay = document.getElementById('status');
+            const trackNameDisplay = document.getElementById('currentTrackName');
+
+            let audioFiles = [];
+            let currentIndex = -1;
+            let isSingleFileMode = false;
+
+            function renderPlaylist() {
+                playlistElement.innerHTML = '';
+                audioFiles.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.innerText = file.name;
+                    li.id = `track-${index}`;
+                    li.onclick = () => playTrack(index);
+                    playlistElement.appendChild(li);
+                });
+            }
+
+            function updateActiveHighlight(index) {
+                document.querySelectorAll('#playlist li').forEach(li => li.classList.remove('active'));
+                const activeLi = document.getElementById(`track-${index}`);
+                if (activeLi) {
+                    activeLi.classList.add('active');
+                    activeLi.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+
+            function playTrack(index, startTime = 0) {
+                if (index < 0 || index >= audioFiles.length) return;
+
+                currentIndex = index;
+                const file = audioFiles[index];
+                const fileURL = URL.createObjectURL(file);
+
+                if (audioPlayer.src && audioPlayer.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(audioPlayer.src);
+                }
+
+                audioPlayer.src = fileURL;
+                audioPlayer.currentTime = startTime;
+                audioPlayer.play().catch(e => console.log("Auto-play blocked:", e));
+
+                updateActiveHighlight(index);
+                trackNameDisplay.innerText = `PLAYING: ${file.name}`;
+                statusDisplay.innerText = `STATUS: PLAYING (${index+1}/${audioFiles.length})`;
+
+                localStorage.setItem('lastPlayedFile', file.name);
+                if (isSingleFileMode) {
+                    localStorage.setItem('lastPlayedMode', 'single');
+                } else {
+                    localStorage.setItem('lastPlayedMode', 'folder');
+                }
+            }
+
+            function loadFiles(files, mode = 'folder') {
+                const audioFileList = files.filter(file => file.type.startsWith('audio/'));
+                if (audioFileList.length === 0) {
+                    alert("沒有可播放的音訊檔案。");
+                    return;
+                }
+
+                audioFileList.sort((a, b) => a.name.localeCompare(b.name));
+                audioFiles = audioFileList;
+                isSingleFileMode = (mode === 'single');
+                renderPlaylist();
+
+                statusDisplay.innerText = `STATUS: LOADED ${audioFiles.length} FILES`;
+
+                const lastFile = localStorage.getItem('lastPlayedFile');
+                const lastTime = localStorage.getItem('lastPlayedTime');
+                const lastMode = localStorage.getItem('lastPlayedMode');
+
+                let resumeIndex = 0;
+                const modeMatch = (mode === 'single' && lastMode === 'single') ||
+                    (mode === 'folder' && lastMode === 'folder');
+
+                if (lastFile && modeMatch) {
+                    const foundIndex = audioFiles.findIndex(f => f.name === lastFile);
+                    if (foundIndex !== -1) resumeIndex = foundIndex;
+                }
+
+                playTrack(resumeIndex, parseFloat(lastTime) || 0);
+            }
+
+            fileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+                loadFiles(files, 'folder');
+                fileInput.value = '';
+            });
+
+            singleFileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length === 0) return;
+                loadFiles(files, 'single');
+                singleFileInput.value = '';
+            });
+
+            audioPlayer.onended = () => {
+                if (currentIndex < audioFiles.length - 1) {
+                    playTrack(currentIndex + 1);
+                } else {
+                    statusDisplay.innerText = "STATUS: FINISHED ALL TRACKS";
+                }
+            };
+
+            audioPlayer.ontimeupdate = () => {
+                if (currentIndex !== -1 && !isNaN(audioPlayer.currentTime)) {
+                    localStorage.setItem('lastPlayedTime', audioPlayer.currentTime);
+                }
+            };
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && currentIndex !== -1) {
+                    e.preventDefault();
+                    if (audioPlayer.paused) {
+                        audioPlayer.play().catch(() => {});
+                    } else {
+                        audioPlayer.pause();
+                    }
+                }
+            });
+
+            statusDisplay.innerText = "STATUS: IDLE";
+            trackNameDisplay.innerText = "—";
+        })();
+    </script>
+
+</body>
+</html>
