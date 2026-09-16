@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Magnifier</title>
+<style>
+  :root{
+    --bg: #0d0f12;
+    --panel: rgba(20,22,26,0.85);
+    --accent: #ffd23f;
+    --accent-dim: #d4ac2b;
+    --text: #f2f2f0;
+    --text-dim: #9a9d a2;
+    --danger: #ff5c5c;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]){
+      --bg: #0d0f12;
+    }
+  }
+  *{ box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body{
+    margin:0; padding:0; width:100%; height:100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+  #app{
+    position: fixed; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+  }
+
+  /* ---- Start screen ---- */
+  #start-screen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap: 22px; padding: 24px; text-align:center; max-width: 420px;
+  }
+  #start-screen .icon{
+    font-size: 64px;
+    filter: drop-shadow(0 4px 10px rgba(255,210,63,0.25));
+  }
+  #start-screen h1{
+    margin:0; font-size: 22px; font-weight:600; letter-spacing:0.2px;
+  }
+  #start-screen p{
+    margin:0; font-size: 14px; color:#b7bac0; line-height:1.5;
+  }
+  #start-btn{
+    margin-top: 8px;
+    background: var(--accent);
+    color: #1a1a1a;
+    border:none;
+    font-size: 17px;
+    font-weight: 700;
+    padding: 16px 40px;
+    border-radius: 999px;
+    cursor:pointer;
+    box-shadow: 0 6px 20px rgba(255,210,63,0.35);
+    transition: transform .12s ease, box-shadow .12s ease;
+  }
+  #start-btn:active{ transform: scale(0.96); box-shadow: 0 3px 10px rgba(255,210,63,0.25); }
+
+  #error-box{
+    display:none;
+    background: rgba(255,92,92,0.12);
+    border: 1px solid rgba(255,92,92,0.4);
+    color: #ffb3b3;
+    padding: 14px 16px;
+    border-radius: 12px;
+    font-size: 13.5px;
+    line-height:1.5;
+    max-width: 340px;
+  }
+
+  /* ---- Camera view ---- */
+  #camera-screen{
+    display:none;
+    position: fixed; inset:0;
+    background:#000;
+  }
+  #video{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    object-fit: cover;
+    transform-origin: center center;
+    transition: filter .15s ease;
+    background:#000;
+  }
+  canvas#capture-canvas{ display:none; }
+
+  /* dark/light adaptive overlay controls */
+  #top-bar{
+    position:absolute; top:0; left:0; right:0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: max(14px, env(safe-area-inset-top)) 16px 14px 16px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0));
+    z-index: 5;
+  }
+  .icon-btn{
+    width: 44px; height:44px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255,255,255,0.12);
+    backdrop-filter: blur(6px);
+    color: var(--text);
+    font-size: 20px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  .icon-btn.active{ background: var(--accent); color:#1a1a1a; }
+
+  #bottom-bar{
+    position:absolute; left:0; right:0; bottom:0;
+    display:flex; flex-direction:column; align-items:center; gap: 14px;
+    padding: 14px 18px max(22px, env(safe-area-inset-bottom)) 18px;
+    background: linear-gradient(to top, rgba(0,0,0,0.6), rgba(0,0,0,0));
+    z-index: 5;
+  }
+  #zoom-row{
+    display:flex; align-items:center; gap:12px;
+    width:100%; max-width: 480px;
+  }
+  #zoom-row span{ font-size:13px; color:#ddd; width: 46px; text-align:center; font-variant-numeric: tabular-nums;}
+  input[type="range"]{
+    flex:1;
+    -webkit-appearance:none; appearance:none;
+    height: 6px; border-radius: 3px;
+    background: rgba(255,255,255,0.25);
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width: 24px; height:24px; border-radius:50%;
+    background: var(--accent);
+    border: 3px solid #1a1a1a;
+    cursor:pointer;
+  }
+  input[type="range"]::-moz-range-thumb{
+    width: 24px; height:24px; border-radius:50%;
+    background: var(--accent);
+    border: 3px solid #1a1a1a;
+    cursor:pointer;
+  }
+  #controls-row{
+    display:flex; align-items:center; justify-content:center; gap: 26px;
+  }
+  #freeze-btn{
+    width: 68px; height:68px; border-radius:50%;
+    background: var(--accent);
+    border: 4px solid rgba(255,255,255,0.5);
+    color:#1a1a1a;
+    font-size: 26px;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+  }
+  #freeze-btn.frozen{ background:#fff; }
+
+  #hint{
+    position:absolute; top: 74px; left:0; right:0;
+    text-align:center;
+    font-size: 12.5px;
+    color: rgba(255,255,255,0.75);
+    z-index: 4;
+    pointer-events:none;
+  }
+
+  #stable-badge{
+    position:absolute; top: 74px; left:50%; transform: translateX(-50%);
+    display:none;
+    align-items:center; gap:6px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(6px);
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12.5px;
+    color: #b7ffb0;
+    z-index: 4;
+    pointer-events:none;
+  }
+  #stable-badge.show{ display:flex; }
+  #stable-badge .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:#4ade80;
+    box-shadow: 0 0 6px #4ade80;
+  }
+
+  .hidden{ display:none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- START SCREEN -->
+  <div id="start-screen">
+    <div class="icon">🔍</div>
+    <h1>Document Magnifier</h1>
+    <p>Turn your camera into a full-screen magnifying glass with autofocus. Point it at a page, zoom in, and let auto-stabilize freeze the image the instant your hand holds still.</p>
+    <button id="start-btn">Start Camera</button>
+    <div id="error-box"></div>
+  </div>
+
+  <!-- CAMERA SCREEN -->
+  <div id="camera-screen">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="capture-canvas"></canvas>
+
+    <div id="hint">Pinch or use the slider to zoom</div>
+    <div id="stable-badge"><span class="dot"></span><span id="stable-text">Steady — locked</span></div>
+
+    <div id="top-bar">
+      <button class="icon-btn" id="close-btn" title="Close">✕</button>
+      <div style="display:flex; gap:10px;">
+        <button class="icon-btn" id="autostable-btn" title="Auto-stabilize">🎯</button>
+        <button class="icon-btn" id="contrast-btn" title="High contrast">◐</button>
+        <button class="icon-btn" id="torch-btn" title="Flashlight">💡</button>
+        <button class="icon-btn" id="fullscreen-btn" title="Fullscreen">⛶</button>
+      </div>
+    </div>
+
+    <div id="bottom-bar">
+      <div id="zoom-row">
+        <span id="zoom-label">1.0×</span>
+        <input type="range" id="zoom-slider" min="1" max="6" step="0.1" value="1">
+      </div>
+      <div id="controls-row">
+        <button id="freeze-btn" title="Freeze frame">❄️</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  const startScreen = document.getElementById('start-screen');
+  const cameraScreen = document.getElementById('camera-screen');
+  const startBtn = document.getElementById('start-btn');
+  const closeBtn = document.getElementById('close-btn');
+  const errorBox = document.getElementById('error-box');
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('capture-canvas');
+  const zoomSlider = document.getElementById('zoom-slider');
+  const zoomLabel = document.getElementById('zoom-label');
+  const freezeBtn = document.getElementById('freeze-btn');
+  const contrastBtn = document.getElementById('contrast-btn');
+  const torchBtn = document.getElementById('torch-btn');
+  const fullscreenBtn = document.getElementById('fullscreen-btn');
+  const autostableBtn = document.getElementById('autostable-btn');
+  const stableBadge = document.getElementById('stable-badge');
+  const stableText = document.getElementById('stable-text');
+  const hint = document.getElementById('hint');
+
+  let stream = null;
+  let track = null;
+  let capabilities = null;
+  let usingNativeZoom = false;
+  let currentZoom = 1;
+  let frozen = false;
+  let autoFrozen = false;
+  let highContrast = false;
+  let torchOn = false;
+  let autoStabilizeOn = false;
+  let motionListenerAttached = false;
+
+  // Pinch-to-zoom state (used as fallback via CSS transform when no native zoom)
+  let pinchStartDist = null;
+  let pinchStartZoom = 1;
+  let cssZoom = 1;
+
+  function showError(msg){
+    errorBox.style.display = 'block';
+    errorBox.textContent = msg;
+  }
+
+  function requestFullscreenSafe(){
+    const el = document.documentElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+    if (req) {
+      try { req.call(el).catch(()=>{}); } catch(e) {}
+    }
+  }
+
+  function exitFullscreenSafe(){
+    const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+    if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) {
+      try { exit.call(document).catch(()=>{}); } catch(e) {}
+    }
+  }
+
+  async function startCamera(){
+    errorBox.style.display = 'none';
+    // Request fullscreen immediately inside the click handler, before any await,
+    // so it still counts as a direct user gesture on strict browsers (e.g. Safari).
+    requestFullscreenSafe();
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      showError("This browser doesn't support camera access. Try opening this page in Safari or Chrome.");
+      return;
+    }
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: false
+      });
+    } catch (err) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        showError("Camera access was denied. Please allow camera permission in your browser settings and try again.");
+      } else if (err.name === 'NotFoundError') {
+        showError("No camera was found on this device.");
+      } else {
+        showError("Couldn't start the camera: " + err.message);
+      }
+      return;
+    }
+
+    video.srcObject = stream;
+    track = stream.getVideoTracks()[0];
+    capabilities = (track.getCapabilities && track.getCapabilities()) || {};
+    usingNativeZoom = !!capabilities.zoom;
+
+    // Continuous autofocus / auto-exposure / auto white-balance where supported,
+    // so the camera keeps re-focusing on the page as it moves.
+    const advanced = [];
+    if (capabilities.focusMode && capabilities.focusMode.includes('continuous')) {
+      advanced.push({ focusMode: 'continuous' });
+    }
+    if (capabilities.exposureMode && capabilities.exposureMode.includes('continuous')) {
+      advanced.push({ exposureMode: 'continuous' });
+    }
+    if (capabilities.whiteBalanceMode && capabilities.whiteBalanceMode.includes('continuous')) {
+      advanced.push({ whiteBalanceMode: 'continuous' });
+    }
+    if (advanced.length) {
+      try { await track.applyConstraints({ advanced }); } catch(e) { /* not fatal */ }
+    }
+
+    if (usingNativeZoom) {
+      const min = capabilities.zoom.min ?? 1;
+      const max = capabilities.zoom.max ?? 6;
+      zoomSlider.min = min;
+      zoomSlider.max = max;
+      zoomSlider.step = capabilities.zoom.step || 0.1;
+      zoomSlider.value = min;
+      currentZoom = min;
+    } else {
+      zoomSlider.min = 1;
+      zoomSlider.max = 6;
+      zoomSlider.step = 0.1;
+      zoomSlider.value = 1;
+      currentZoom = 1;
+    }
+    updateZoomLabel();
+
+    torchBtn.style.display = capabilities.torch ? 'flex' : 'none';
+
+    startScreen.style.display = 'none';
+    cameraScreen.style.display = 'block';
+
+    setTimeout(()=>{ hint.style.opacity = '0'; hint.style.transition = 'opacity .6s'; }, 3500);
+  }
+
+  function updateZoomLabel(){
+    zoomLabel.textContent = currentZoom.toFixed(1) + '×';
+  }
+
+  async function applyZoom(z){
+    currentZoom = z;
+    updateZoomLabel();
+    if (usingNativeZoom && track) {
+      try {
+        await track.applyConstraints({ advanced: [{ zoom: z }] });
+      } catch(e) { /* fall through to css */ }
+    } else {
+      cssZoom = z;
+      video.style.transform = `scale(${cssZoom})`;
+    }
+  }
+
+  zoomSlider.addEventListener('input', (e)=>{
+    applyZoom(parseFloat(e.target.value));
+  });
+
+  // Pinch to zoom on the video
+  function dist(t1, t2){
+    const dx = t1.clientX - t2.clientX;
+    const dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx*dx + dy*dy);
+  }
+
+  cameraScreen.addEventListener('touchstart', (e)=>{
+    if (e.touches.length === 2) {
+      pinchStartDist = dist(e.touches[0], e.touches[1]);
+      pinchStartZoom = currentZoom;
+    }
+  }, { passive: true });
+
+  cameraScreen.addEventListener('touchmove', (e)=>{
+    if (e.touches.length === 2 && pinchStartDist) {
+      const d = dist(e.touches[0], e.touches[1]);
+      const ratio = d / pinchStartDist;
+      const min = parseFloat(zoomSlider.min);
+      const max = parseFloat(zoomSlider.max);
+      let newZoom = Math.min(max, Math.max(min, pinchStartZoom * ratio));
+      zoomSlider.value = newZoom;
+      applyZoom(newZoom);
+    }
+  }, { passive: true });
+
+  cameraScreen.addEventListener('touchend', (e)=>{
+    if (e.touches.length < 2) pinchStartDist = null;
+  });
+
+  // Freeze frame (manual or automatic via stabilize)
+  function setFrozen(state, auto){
+    frozen = state;
+    freezeBtn.classList.toggle('frozen', frozen);
+    freezeBtn.textContent = frozen ? '▶️' : '❄️';
+    if (frozen) {
+      video.pause();
+    } else {
+      video.play();
+    }
+    autoFrozen = !!(state && auto);
+    stableBadge.classList.toggle('show', autoFrozen);
+  }
+
+  freezeBtn.addEventListener('click', ()=>{
+    setFrozen(!frozen, false);
+  });
+
+  // ---- Auto-stabilize: uses the device's motion sensor to detect when your
+  // hand is steady, then automatically freezes the frame; unfreezes again
+  // as soon as you move the device. ----
+  let jitterEMA = 0;
+  let lastAccel = null;
+  let steadySince = null;
+  const STEADY_MS = 550;      // how long it must stay still before auto-freezing
+  const STEADY_THRESHOLD = 0.35; // m/s^2 jitter threshold considered "steady"
+  const MOVE_THRESHOLD = 1.1;    // jitter threshold considered "moving again"
+
+  function handleMotion(e){
+    const a = e.accelerationIncludingGravity || e.acceleration;
+    if (!a || a.x === null) return;
+    if (lastAccel){
+      const dx = a.x - lastAccel.x, dy = a.y - lastAccel.y, dz = a.z - lastAccel.z;
+      const jerk = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      jitterEMA = jitterEMA * 0.8 + jerk * 0.2;
+    }
+    lastAccel = { x: a.x, y: a.y, z: a.z };
+
+    if (!autoStabilizeOn) return;
+
+    const now = Date.now();
+    if (jitterEMA < STEADY_THRESHOLD) {
+      if (steadySince === null) steadySince = now;
+      if (!frozen && (now - steadySince) > STEADY_MS) {
+        setFrozen(true, true);
+      }
+    } else {
+      steadySince = null;
+      if (frozen && autoFrozen && jitterEMA > MOVE_THRESHOLD) {
+        setFrozen(false, false);
+      }
+    }
+  }
+
+  async function enableAutoStabilize(){
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      // iOS 13+ requires an explicit permission prompt triggered by a tap.
+      try {
+        const res = await DeviceMotionEvent.requestPermission();
+        if (res !== 'granted') {
+          showTempNotice("Motion permission denied — auto-stabilize needs it to detect steadiness.");
+          return false;
+        }
+      } catch(e) {
+        showTempNotice("Couldn't request motion permission on this browser.");
+        return false;
+      }
+    } else if (typeof DeviceMotionEvent === 'undefined') {
+      showTempNotice("This browser doesn't support motion sensing, so auto-stabilize isn't available.");
+      return false;
+    }
+    if (!motionListenerAttached) {
+      window.addEventListener('devicemotion', handleMotion);
+      motionListenerAttached = true;
+    }
+    return true;
+  }
+
+  function showTempNotice(msg){
+    stableText.textContent = msg;
+    stableBadge.classList.add('show');
+    setTimeout(()=>{ if (!autoFrozen) stableBadge.classList.remove('show'); stableText.textContent = 'Steady — locked'; }, 2800);
+  }
+
+  autostableBtn.addEventListener('click', async ()=>{
+    if (!autoStabilizeOn) {
+      const ok = await enableAutoStabilize();
+      if (!ok) return;
+      autoStabilizeOn = true;
+      autostableBtn.classList.add('active');
+    } else {
+      autoStabilizeOn = false;
+      autostableBtn.classList.remove('active');
+      if (autoFrozen) setFrozen(false, false);
+    }
+  });
+
+  // Fullscreen toggle
+  fullscreenBtn.addEventListener('click', ()=>{
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      exitFullscreenSafe();
+    } else {
+      requestFullscreenSafe();
+    }
+  });
+
+  // High contrast toggle (helps read faint text)
+  contrastBtn.addEventListener('click', ()=>{
+    highContrast = !highContrast;
+    contrastBtn.classList.toggle('active', highContrast);
+    video.style.filter = highContrast ? 'contrast(1.7) brightness(1.15) grayscale(0.15)' : 'none';
+  });
+
+  // Torch / flashlight
+  torchBtn.addEventListener('click', async ()=>{
+    if (!capabilities || !capabilities.torch || !track) return;
+    torchOn = !torchOn;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: torchOn }] });
+      torchBtn.classList.toggle('active', torchOn);
+    } catch(e) {
+      torchOn = !torchOn;
+    }
+  });
+
+  function stopCamera(){
+    if (stream) {
+      stream.getTracks().forEach(t=>t.stop());
+      stream = null;
+    }
+    frozen = false;
+    autoFrozen = false;
+    freezeBtn.classList.remove('frozen');
+    freezeBtn.textContent = '❄️';
+    video.style.filter = 'none';
+    highContrast = false;
+    contrastBtn.classList.remove('active');
+    video.style.transform = 'scale(1)';
+    cssZoom = 1;
+    autoStabilizeOn = false;
+    autostableBtn.classList.remove('active');
+    stableBadge.classList.remove('show');
+    cameraScreen.style.display = 'none';
+    startScreen.style.display = 'flex';
+    exitFullscreenSafe();
+  }
+
+  startBtn.addEventListener('click', startCamera);
+  closeBtn.addEventListener('click', stopCamera);
+})();
+</script>
+</body>
+</html>
