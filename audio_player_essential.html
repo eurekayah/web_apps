@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>Terminal Audio Player</title>
+    <style>
+        :root {
+            --color-green: #00ff00;
+            --color-bg: #000000;
+            --color-dim: #004400;
+            --color-yellow: #ffff00;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--color-bg);
+            color: var(--color-green);
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 16px;
+            min-height: 100vh;
+            text-transform: uppercase;
+            font-size: 1rem;
+        }
+
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .player-section,
+        .playlist-section {
+            border: 1px solid var(--color-green);
+            padding: 14px;
+        }
+
+        .player-section {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        #fileInput,
+        #singleFileInput {
+            display: none;
+        }
+
+        .btn {
+            background: #333;
+            color: var(--color-yellow);
+            border: none;
+            padding: 12px 18px;
+            font-family: inherit;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1 0 auto;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        .btn:hover {
+            background: #111;
+            outline: 1px solid var(--color-green);
+        }
+
+        .btn.active {
+            background: var(--color-green);
+            color: var(--color-bg);
+        }
+
+        .status-area {
+            border-bottom: 1px dashed var(--color-dim);
+            padding-bottom: 6px;
+            font-size: 0.9rem;
+            word-break: break-word;
+        }
+
+        .track-name {
+            color: #fff;
+            font-size: 0.95rem;
+            word-break: break-all;
+        }
+
+        .playlist-header {
+            background: var(--color-dim);
+            padding: 8px;
+            text-align: center;
+            font-weight: bold;
+            margin: -14px -14px 10px -14px;
+            border-bottom: 1px solid var(--color-green);
+        }
+
+        #playlist {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 50vh;
+            overflow-y: auto;
+        }
+
+        #playlist li {
+            padding: 12px 10px;
+            border-bottom: 1px solid var(--color-dim);
+            cursor: pointer;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #playlist li:hover {
+            background: var(--color-dim);
+        }
+
+        #playlist li.active {
+            background: var(--color-green);
+            color: var(--color-bg);
+        }
+
+        #playlist li.active::before {
+            content: "> ";
+        }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--color-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--color-dim); border: 1px solid var(--color-green); }
+
+        @media (min-width: 768px) {
+            .main-container {
+                flex-direction: row;
+                max-width: 1100px;
+                align-items: flex-start;
+            }
+            .player-section { flex: 3; }
+            .playlist-section { flex: 2; }
+            #playlist { max-height: 70vh; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <div class="player-section">
+            <div class="btn-group">
+                <label for="fileInput" class="btn">SELECT FOLDER</label>
+                <input type="file" id="fileInput" webkitdirectory directory multiple>
+                <label for="singleFileInput" class="btn">SELECT FILE</label>
+                <input type="file" id="singleFileInput" accept="audio/*">
+            </div>
+
+            <div class="btn-group">
+                <button id="prevBtn" class="btn" type="button">◄ PREV</button>
+                <button id="playBtn" class="btn" type="button">► PLAY</button>
+                <button id="nextBtn" class="btn" type="button">NEXT ►</button>
+            </div>
+
+            <div class="btn-group">
+                <button id="repeatBtn" class="btn" type="button">REPEAT: OFF</button>
+            </div>
+
+            <div class="status-area" id="status">STATUS: IDLE</div>
+            <div class="track-name" id="currentTrackName">—</div>
+        </div>
+
+        <div class="playlist-section">
+            <div class="playlist-header">FILES_LIST</div>
+            <ul id="playlist"></ul>
+        </div>
+    </div>
+
+    <audio id="audioPlayer"></audio>
+
+    <script>
+        (function() {
+            const fileInput = document.getElementById('fileInput');
+            const singleFileInput = document.getElementById('singleFileInput');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playlistElement = document.getElementById('playlist');
+            const statusDisplay = document.getElementById('status');
+            const trackNameDisplay = document.getElementById('currentTrackName');
+            const repeatBtn = document.getElementById('repeatBtn');
+            const playBtn = document.getElementById('playBtn');
+
+            let audioFiles = [];
+            let currentIndex = -1;
+            let repeatMode = 'off';  // 'off' | 'all' | 'one'
+
+            const AUDIO_EXTENSIONS = ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac', 'flac', 'opus', 'aiff', 'aif', 'alac', 'webm'];
+            const UNSUPPORTED_EXTENSIONS = ['wma', 'wmv', 'asf', 'ape', 'wv', 'mid', 'midi', 'amr', 'au', 'ra', 'rm'];
+
+            function isAudioFile(file) {
+                const name = file.name || '';
+                const ext = name.split('.').pop().toLowerCase();
+                if (UNSUPPORTED_EXTENSIONS.includes(ext)) return false;
+                if (AUDIO_EXTENSIONS.includes(ext)) return true;
+                if (file.type && file.type.toLowerCase().startsWith('audio/')) return true;
+                return false;
+            }
+
+            function renderPlaylist() {
+                playlistElement.innerHTML = '';
+                audioFiles.forEach((file, index) => {
+                    const li = document.createElement('li');
+                    li.innerText = file.name;
+                    li.onclick = () => playTrack(index);
+                    playlistElement.appendChild(li);
+                });
+            }
+
+            function updateActiveHighlight() {
+                document.querySelectorAll('#playlist li').forEach((li, i) => {
+                    li.classList.toggle('active', i === currentIndex);
+                });
+            }
+
+            function updatePlayBtn() {
+                playBtn.innerText = audioPlayer.paused ? '► PLAY' : '❚❚ PAUSE';
+            }
+
+            function updateRepeatBtn() {
+                const labels = { 'off': 'REPEAT: OFF', 'all': 'REPEAT: ALL', 'one': 'REPEAT: ONE' };
+                repeatBtn.innerText = labels[repeatMode];
+                repeatBtn.classList.toggle('active', repeatMode !== 'off');
+            }
+
+            function playTrack(index) {
+                if (index < 0 || index >= audioFiles.length) return;
+                currentIndex = index;
+                const file = audioFiles[index];
+
+                if (audioPlayer.src && audioPlayer.src.startsWith('blob:')) {
+                    URL.revokeObjectURL(audioPlayer.src);
+                }
+
+                audioPlayer.src = URL.createObjectURL(file);
+                audioPlayer.play().catch(e => console.log("Play blocked:", e));
+
+                updateActiveHighlight();
+                trackNameDisplay.innerText = file.name;
+                statusDisplay.innerText = `STATUS: PLAYING (${index+1}/${audioFiles.length})`;
+            }
+
+            function loadFiles(files) {
+                const list = files.filter(isAudioFile).sort((a, b) => a.name.localeCompare(b.name));
+                if (list.length === 0) {
+                    alert("沒有可播放的音訊檔案。");
+                    return;
+                }
+                audioFiles = list;
+                currentIndex = -1;
+                renderPlaylist();
+                statusDisplay.innerText = `STATUS: LOADED ${audioFiles.length} FILES`;
+                trackNameDisplay.innerText = "—";
+                playTrack(0);
+            }
+
+            fileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length) loadFiles(files);
+                fileInput.value = '';
+            });
+
+            singleFileInput.addEventListener('change', (e) => {
+                const files = Array.from(e.target.files);
+                if (files.length) loadFiles(files);
+                singleFileInput.value = '';
+            });
+
+            playBtn.addEventListener('click', () => {
+                if (currentIndex === -1) return;
+                if (audioPlayer.paused) audioPlayer.play();
+                else audioPlayer.pause();
+            });
+
+            document.getElementById('prevBtn').addEventListener('click', () => {
+                if (audioFiles.length === 0) return;
+                const prev = (currentIndex - 1 + audioFiles.length) % audioFiles.length;
+                playTrack(prev);
+            });
+
+            document.getElementById('nextBtn').addEventListener('click', () => {
+                if (audioFiles.length === 0) return;
+                const next = (currentIndex + 1) % audioFiles.length;
+                playTrack(next);
+            });
+
+            repeatBtn.addEventListener('click', () => {
+                const cycle = { 'off': 'all', 'all': 'one', 'one': 'off' };
+                repeatMode = cycle[repeatMode];
+                updateRepeatBtn();
+            });
+
+            audioPlayer.addEventListener('play', updatePlayBtn);
+            audioPlayer.addEventListener('pause', updatePlayBtn);
+
+            audioPlayer.onended = () => {
+                if (repeatMode === 'one') {
+                    playTrack(currentIndex);
+                    return;
+                }
+                if (currentIndex < audioFiles.length - 1) {
+                    playTrack(currentIndex + 1);
+                    return;
+                }
+                if (repeatMode === 'all') {
+                    playTrack(0);
+                } else {
+                    statusDisplay.innerText = "STATUS: FINISHED ALL TRACKS";
+                }
+            };
+
+            window.addEventListener('keydown', (e) => {
+                if (e.code === 'Space' && currentIndex !== -1) {
+                    e.preventDefault();
+                    if (audioPlayer.paused) audioPlayer.play();
+                    else audioPlayer.pause();
+                }
+            });
+
+            updateRepeatBtn();
+            updatePlayBtn();
+        })();
+    </script>
+
+</body>
+</html>
